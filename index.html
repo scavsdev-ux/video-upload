@@ -346,14 +346,35 @@
 
       if (!uploadRes.ok) throw new Error(`Erro ${uploadRes.status} no upload`);
 
+      progressFill.style.width = '70%';
+      progressLabel.textContent = 'Registrando na Shopify...';
+
+      // Etapa 3: registrar na Shopify
+      const registerRes = await fetch(`https://dry-math-3d6c.scavsdev.workers.dev`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Store': SHOPIFY_STORE,
+          'X-Shopify-Token': SHOPIFY_TOKEN
+        },
+        body: JSON.stringify({
+          action: 'register',
+          resourceUrl: target.resourceUrl,
+          filename: filename,
+          mimeType: mimeType
+        })
+      });
+
+      const registerData = await registerRes.json();
+      const userErrors = registerData?.data?.fileCreate?.userErrors;
+      if (userErrors?.length) throw new Error(userErrors[0].message);
+
       progressFill.style.width = '100%';
       progressLabel.textContent = 'Concluído!';
 
-      const resourceUrl = target.resourceUrl;
-
       result.className = 'result success';
       resultTitle.textContent = '✓ Arquivo enviado com sucesso';
-      resultUrl.innerHTML = `<a href="${resourceUrl}" target="_blank">${resourceUrl}</a>`;
+      resultUrl.textContent = 'Arquivo disponível em Conteúdo → Arquivos na sua loja Shopify';
 
     } catch (err) {
       progressFill.style.width = '100%';
