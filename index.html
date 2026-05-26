@@ -366,8 +366,8 @@
       });
 
       const registerData = await registerRes.json();
-      const userErrors = registerData?.data?.fileCreate?.userErrors;
-      if (userErrors?.length) throw new Error(userErrors[0].message);
+      const registerErrors = registerData?.data?.fileCreate?.userErrors;
+      if (registerErrors?.length) throw new Error(registerErrors[0].message);
 
       progressFill.style.width = '100%';
       progressLabel.textContent = 'Concluído!';
