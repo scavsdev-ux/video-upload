@@ -307,48 +307,53 @@
     result.className = 'result';
 
     try {
-      const base64 = await toBase64(selectedFile);
-      progressFill.style.width = '30%';
-      progressLabel.textContent = 'Enviando para Shopify...';
-
-      const attachment = base64.split(',')[1];
       const filename = selectedFile.name;
       const mimeType = selectedFile.type;
+      const fileSize = selectedFile.size;
 
-      const body = JSON.stringify({
-        filename: filename,
-        attachment: attachment,
-        contentType: mimeType
-      });
-
-      const response = await fetch(`https://dry-math-3d6c.scavsdev.workers.dev`, {
+      // Etapa 1: pedir URL temporária para upload
+      progressLabel.textContent = 'Solicitando URL de upload...';
+      const stageRes = await fetch(`https://dry-math-3d6c.scavsdev.workers.dev`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Shopify-Store': SHOPIFY_STORE,
           'X-Shopify-Token': SHOPIFY_TOKEN
         },
-        body: body
+        body: JSON.stringify({ filename, mimeType, fileSize })
       });
 
-      progressFill.style.width = '90%';
+      if (!stageRes.ok) throw new Error(`Erro ${stageRes.status} ao solicitar URL`);
 
-      if (!response.ok) {
-        throw new Error(`Erro ${response.status}: ${await response.text()}`);
-      }
+      const stageData = await stageRes.json();
+      const target = stageData?.data?.stagedUploadsCreate?.stagedTargets?.[0];
+      const userErrors = stageData?.data?.stagedUploadsCreate?.userErrors;
+      if (userErrors?.length) throw new Error(userErrors[0].message);
+      if (!target) throw new Error('URL de upload não retornada');
 
-      const data = await response.json();
+      progressFill.style.width = '30%';
+
+      // Etapa 2: enviar arquivo direto para o Google Storage
+      progressLabel.textContent = 'Enviando arquivo...';
+      const formData = new FormData();
+      target.parameters.forEach(p => formData.append(p.name, p.value));
+      formData.append('file', selectedFile);
+
+      const uploadRes = await fetch(target.url, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!uploadRes.ok) throw new Error(`Erro ${uploadRes.status} no upload`);
+
       progressFill.style.width = '100%';
       progressLabel.textContent = 'Concluído!';
 
-      const files = data?.data?.fileCreate?.files;
-      const fileUrl = files?.[0]?.url || files?.[0]?.image?.url || files?.[0]?.sources?.[0]?.url || 'URL não disponível';
-      const userErrors = data?.data?.fileCreate?.userErrors;
-      if (userErrors?.length) throw new Error(userErrors[0].message);
+      const resourceUrl = target.resourceUrl;
 
       result.className = 'result success';
       resultTitle.textContent = '✓ Arquivo enviado com sucesso';
-      resultUrl.innerHTML = `<a href="${fileUrl}" target="_blank">${fileUrl}</a>`;
+      resultUrl.innerHTML = `<a href="${resourceUrl}" target="_blank">${resourceUrl}</a>`;
 
     } catch (err) {
       progressFill.style.width = '100%';
